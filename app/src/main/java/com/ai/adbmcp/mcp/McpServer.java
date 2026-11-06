@@ -80,12 +80,23 @@ public final class McpServer {
             String path = parts.length > 1 ? parts[1] : "/";
 
             int contentLength = 0;
+            boolean wantsSse = false;
             String line;
             while ((line = readLine(in)) != null && !line.isEmpty()) {
                 int idx = line.indexOf(':');
-                if (idx > 0 && line.substring(0, idx).trim().equalsIgnoreCase("Content-Length")) {
-                    try { contentLength = Integer.parseInt(line.substring(idx + 1).trim()); } catch (NumberFormatException ignored) { }
+                if (idx <= 0) continue;
+                String hk = line.substring(0, idx).trim();
+                String hv = line.substring(idx + 1).trim();
+                if (hk.equalsIgnoreCase("Content-Length")) {
+                    try { contentLength = Integer.parseInt(hv); } catch (NumberFormatException ignored) { }
+                } else if (hk.equalsIgnoreCase("Accept") && hv.contains("text/event-stream")) {
+                    wantsSse = true;
                 }
+            }
+
+            if ("GET".equals(method) && !path.startsWith("/health") && !path.startsWith("/mcp")) {
+                respond(out, "{\"ok\":true,\"mcp\":\"POST /mcp\",\"health\":\"/health\"}");
+                return;
             }
 
             if ("GET".equals(method)) {
@@ -107,7 +118,8 @@ public final class McpServer {
                 if (n < 0) break;
                 read += n;
             }
-            respond(out, process(new String(body, 0, read, StandardCharsets.UTF_8)));
+            String json = process(new String(body, 0, read, StandardCharsets.UTF_8));
+            if (wantsSse) respondSse(out, json); else respond(out, json);
         } catch (Exception e) {
             Log.w(TAG, "handle: " + e);
         }
@@ -117,6 +129,18 @@ public final class McpServer {
         byte[] b = json.getBytes(StandardCharsets.UTF_8);
         String head = "HTTP/1.1 200 OK\r\n"
                 + "Content-Type: application/json; charset=utf-8\r\n"
+                + "Content-Length: " + b.length + "\r\n"
+                + "Connection: close\r\n\r\n";
+        out.write(head.getBytes(StandardCharsets.UTF_8));
+        out.write(b);
+        out.flush();
+    }
+
+    private void respondSse(OutputStream out, String json) throws IOException {
+        byte[] b = ("event: message\ndata: " + json + "\n\n").getBytes(StandardCharsets.UTF_8);
+        String head = "HTTP/1.1 200 OK\r\n"
+                + "Content-Type: text/event-stream; charset=utf-8\r\n"
+                + "Cache-Control: no-cache\r\n"
                 + "Content-Length: " + b.length + "\r\n"
                 + "Connection: close\r\n\r\n";
         out.write(head.getBytes(StandardCharsets.UTF_8));
