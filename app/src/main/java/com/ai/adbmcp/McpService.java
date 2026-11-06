@@ -5,6 +5,7 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.ServiceInfo;
 import android.os.Build;
 import android.os.IBinder;
@@ -12,6 +13,8 @@ import android.util.Log;
 
 import com.ai.adbmcp.adb.AdbManager;
 import com.ai.adbmcp.mcp.McpServer;
+
+import java.io.File;
 
 /** 前台服务：保活 + 常驻 MCP HTTP 服务。 */
 public class McpService extends Service {
@@ -25,8 +28,11 @@ public class McpService extends Service {
     public void onCreate() {
         super.onCreate();
         startAsForeground();
+        ADB.setKeyDir(new File(getFilesDir(), "keys"));
+        SharedPreferences sp = getSharedPreferences("cfg", MODE_PRIVATE);
+        String bind = sp.getBoolean("lan", false) ? "0.0.0.0" : "127.0.0.1";
         try {
-            server = new McpServer(PORT, ADB);
+            server = new McpServer(PORT, ADB, bind);
             server.start();
         } catch (Exception e) {
             Log.e("AdbMcp", "MCP 启动失败", e);
@@ -41,14 +47,14 @@ public class McpService extends Service {
             nm.createNotificationChannel(ch);
             n = new Notification.Builder(this, CHANNEL)
                     .setContentTitle("ADB MCP 运行中")
-                    .setContentText("MCP: 127.0.0.1:" + PORT)
+                    .setContentText("MCP: " + (getSharedPreferences("cfg", MODE_PRIVATE).getBoolean("lan", false) ? "0.0.0.0" : "127.0.0.1") + ":" + PORT)
                     .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
                     .setOngoing(true)
                     .build();
         } else {
             n = new Notification.Builder(this)
                     .setContentTitle("ADB MCP 运行中")
-                    .setContentText("MCP: 127.0.0.1:" + PORT)
+                    .setContentText("MCP: " + (getSharedPreferences("cfg", MODE_PRIVATE).getBoolean("lan", false) ? "0.0.0.0" : "127.0.0.1") + ":" + PORT)
                     .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
                     .setOngoing(true)
                     .build();

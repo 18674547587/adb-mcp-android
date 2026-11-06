@@ -14,6 +14,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -62,6 +63,17 @@ public class MainActivity extends Activity {
         mcpBtn.setText("② 启动 MCP 服务 (127.0.0.1:7788)");
         mcpBtn.setOnClickListener(v -> startMcp());
         root.addView(mcpBtn);
+
+        CheckBox lanBox = new CheckBox(this);
+        lanBox.setText("允许局域网访问 MCP（0.0.0.0:7788）");
+        lanBox.setChecked(getSharedPreferences("cfg", MODE_PRIVATE).getBoolean("lan", false));
+        lanBox.setOnCheckedChangeListener((v, checked) -> {
+            getSharedPreferences("cfg", MODE_PRIVATE).edit().putBoolean("lan", checked).apply();
+            stopService(new Intent(this, McpService.class));
+            ui.postDelayed(this::startMcp, 300);
+            setStatus(checked ? "监听地址：0.0.0.0:7788（局域网可访问）" : "监听地址：127.0.0.1:7788（仅本机）");
+        });
+        root.addView(lanBox);
 
         setContentView(root);
 

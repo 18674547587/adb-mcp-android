@@ -23,6 +23,7 @@ public final class McpServer {
     private static final String TAG = "AdbMcp";
 
     private final int port;
+    private final String bindAddr;
     private final AdbManager adb;
     private final McpTools tools;
 
@@ -30,8 +31,9 @@ public final class McpServer {
     private volatile boolean running;
     private Thread acceptThread;
 
-    public McpServer(int port, AdbManager adb) {
+    public McpServer(int port, AdbManager adb, String bindAddr) {
         this.port = port;
+        this.bindAddr = bindAddr;
         this.adb = adb;
         this.tools = new McpTools(adb);
     }
@@ -41,12 +43,12 @@ public final class McpServer {
     public void start() throws IOException {
         serverSocket = new ServerSocket();
         serverSocket.setReuseAddress(true);
-        serverSocket.bind(new InetSocketAddress(InetAddress.getByName("127.0.0.1"), port));
+        serverSocket.bind(new InetSocketAddress(InetAddress.getByName(bindAddr), port));
         running = true;
         acceptThread = new Thread(this::acceptLoop, "mcp-accept");
         acceptThread.setDaemon(true);
         acceptThread.start();
-        Log.i(TAG, "MCP listening on 127.0.0.1:" + port);
+        Log.i(TAG, "MCP listening on " + bindAddr + ":" + port);
     }
 
     public void stop() {

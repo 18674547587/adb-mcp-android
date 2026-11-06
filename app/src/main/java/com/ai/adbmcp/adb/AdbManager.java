@@ -6,6 +6,7 @@ import android.hardware.usb.UsbEndpoint;
 import android.hardware.usb.UsbInterface;
 import android.hardware.usb.UsbManager;
 
+import java.io.File;
 import java.io.IOException;
 
 /** 管理 USB 设备 → ADB 连接的完整生命周期。 */
@@ -16,9 +17,12 @@ public final class AdbManager {
     private AdbCrypto crypto;
     private String deviceName = "";
     private String status = "未连接";
+    private File keyDir;
 
     public synchronized String getStatus() { return status; }
     public synchronized String getDeviceName() { return deviceName; }
+    public void setKeyDir(File d) { this.keyDir = d; }
+
     public synchronized boolean isConnected() { return adb != null; }
 
     public synchronized void connect(UsbManager mgr, UsbDevice dev, long timeoutMs) throws Exception {
@@ -52,7 +56,7 @@ public final class AdbManager {
         deviceName = dev.getDeviceName() + " (" + String.format("%04x:%04x", dev.getVendorId(), dev.getProductId()) + ")";
         status = "握手…";
 
-        crypto = AdbCrypto.generate();
+        crypto = (keyDir != null) ? AdbCrypto.loadOrGenerate(keyDir) : AdbCrypto.generate();
         UsbTransport t = new UsbTransport(usbConn, in, out);
         adb = new AdbConnection(t, crypto);
         adb.connect(timeoutMs);
