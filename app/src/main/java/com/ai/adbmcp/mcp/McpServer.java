@@ -22,6 +22,21 @@ import java.nio.charset.StandardCharsets;
 public final class McpServer {
     private static final String TAG = "AdbMcp";
 
+    private static final java.util.ArrayDeque<String> LOGS = new java.util.ArrayDeque<>();
+
+    /** 供 UI 展示的最近请求记录。 */
+    public static void log(String s) {
+        synchronized (LOGS) {
+            String ts = new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US).format(new java.util.Date());
+            LOGS.addLast(ts + "  " + s);
+            while (LOGS.size() > 80) LOGS.removeFirst();
+        }
+    }
+
+    public static java.util.List<String> recentLogs() {
+        synchronized (LOGS) { return new java.util.ArrayList<>(LOGS); }
+    }
+
     private final int port;
     private final String bindAddr;
     private final AdbManager adb;
@@ -186,7 +201,12 @@ public final class McpServer {
                 JSONObject p = req.optJSONObject("params");
                 String name = p != null ? p.optString("name") : "";
                 JSONObject args = p != null ? p.optJSONObject("arguments") : null;
+                long t0 = System.currentTimeMillis();
                 McpTools.Result r = tools.call(name, args == null ? new JSONObject() : args);
+                String brief = r.text == null ? "" : r.text.replace("\n", " ");
+                if (brief.length() > 48) brief = brief.substring(0, 48) + "…";
+                log((r.ok ? "✓ " : "✗ ") + name + "  " + brief
+                        + "  (" + (System.currentTimeMillis() - t0) + "ms)");
 
                 JSONArray content = new JSONArray();
                 if (r.image != null) {
